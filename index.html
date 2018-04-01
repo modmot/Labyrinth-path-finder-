@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+	<title>Visualisierung von Algorithmen: Labyrinth</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="http://www.w3schools.com/lib/w3.css">
+</head>
+
+<body class="w3-container">
+
+	<header class="w3-container w3-blue w3-round-large w3-card-4">
+		<h1>Visualisierung von Algorithmen: Labyrinth</h1>
+	</header>
+	<p>by NAME... (2015)</p>
+	<p>First enter size of Lab then click redraw and then start searchWayOut</p>
+
+	<form class="w3-form w3-card-4">
+
+		<div class="w3-input-group">
+			<input id="input_size" type="number" value="20" min="4" max="40" placeholder="20" maxlength="3" size="3">
+			<label>Labyrinth-Size</label>
+		</div>
+
+		<div class="w3-input-group">
+			<input id="input_slow" type="number" value="5" min="0" max="1000" placeholder="5" maxlength="3" size="3">
+			<label>Verz&ouml;gerung</label>
+
+		</div>
+
+		<div class="w3-input-group">
+			<input type="button" class="w3-btn w3-blue w3-round-large" value="draw Labyrinth" onclick="start_redraw();" />
+			<input type="button" class="w3-btn w3-blue w3-round-large" value="searchWayOut" onclick="start_searchwayout();" />
+		</div>
+	</form>
+
+	<p id="duration">
+		elapsed time ...
+	</p>
+
+	<p>
+		<canvas id="canvas" width="600" height="400" class="w3-round-large w3-card-4" style="background-color:blue"></canvas>
+	</p>
+
+	<p>
+		See also:
+		<ul class="w3-ul w3-card-4">
+			<li>
+				<a href="http://www.w3schools.com/w3css/default.asp">http://www.w3schools.com/w3css/default.asp</a>
+			</li>
+			<li>
+				<a href="http://www.w3schools.com/js/default.asp">http://www.w3schools.com/js/default.asp</a>
+			</li>
+		</ul>
+	</p>
+
+
+	<footer class="w3-container w3-blue w3-round-large w3-card-4">
+		<p>NAME .... (2015)</p>
+	</footer>
+
+
+	<script>
+		var canvas = document.getElementById("canvas");
+		var gc = canvas.getContext("2d");
+		var width = document.getElementById("canvas").getAttribute("width");
+		var height = document.getElementById("canvas").getAttribute("height");
+
+		var input_size = document.getElementById("input_size");
+		var size = input_size.value;
+
+		var input_slow = document.getElementById("input_slow");
+		var slow = input_slow.value;
+
+
+		var rows = Math.floor(height / size);
+		var cols = Math.floor(width / size);
+
+
+		// time measure (duration)
+		var start;
+		var elapsed;
+
+		// the Labyrinth is a 2 dim Array
+		var a = [
+			[]
+		];
+
+		// init
+		// ----------------------------------------------------------------
+		start_redraw();
+
+		var FPS = 100;
+
+		/**
+		 * Returns a random integer between min (inclusive) and max (inclusive)
+		 * Using Math.round() will give you a non-uniform distribution!
+		 */
+		function getRandomInt(min, max) {
+			return Math.floor(Math.random() * (max - min + 1)) + min;
+		}
+
+
+
+		function start_redraw() {
+			size = size = input_size.value;
+
+			rows = Math.floor(height / size);
+			cols = Math.floor(width / size);
+
+
+			for (var x = 0; x < cols; x++) {
+				a[x] = [];
+				for (var y = 0; y < rows; y++) {
+					if (getRandomInt(0, 100) < 33) //höchstens 1/3 schwarz
+						a[x][y] = "black";
+					else
+						a[x][y] = "white";
+				}
+			}
+
+			//Umrandung oben und unten zeichnen
+			for (var x = 0; x < cols; x++) {
+				a[x][0] = "black"; //oben
+				a[x][rows - 1] = "black"; //unten
+			}
+
+			//Umrandung links und rechts zeichnen
+			for (var y = 0; y < rows; y++) {
+				a[0][y] = "black"; // li
+				a[cols - 1][y] = "black"; // re
+			}
+
+			//' Eingang und ausgang
+			a[0][0] = "white";
+			a[0][1] = "white";
+
+			a[cols - 1][rows - 1] = "white";
+			a[cols - 1][rows - 2] = "white";
+
+			paint();
+		}
+
+
+
+		function paint() {
+			console.log("paint");
+			for (var x = 0; x < cols; x++) {
+				for (var y = 0; y < rows; y++) {
+					gc.fillStyle = a[x][y];
+					gc.fillRect(x * size, y * size, size, size);
+				}
+			}
+		}
+
+
+		function start_searchwayout() {
+			start = new Date().getTime();
+
+			// START web worker
+			var worker = new Worker("worker_labyrinth.js");
+
+
+			// SENDING array data to the worker using a copy memory operation
+			slow = input_slow.value;
+			worker.postMessage({
+				a: a,
+				rows: rows,
+				cols: cols,
+				slow: slow
+			});
+
+			// RECEIVEING array
+			// finished: 1|-1, found: 1|-1 , element: a[][] ,y: y ,x:x
+
+			worker.onmessage = function (event) {
+				a[event.data.xx][event.data.yy] = event.data.element;
+				gc.fillStyle = a[event.data.xx][event.data.yy];
+				gc.fillRect(event.data.xx * size, event.data.yy * size, size, size);
+
+				if (event.data.finished == 1) {
+					elapsed = new Date().getTime() - start;
+					document.getElementById("duration").innerHTML = "elapsed time " + elapsed + " ms";
+
+					if (event.data.found == 1) {
+						alert("FOUND!!!");
+					} else {
+						alert("NOT found!!!");
+					}
+
+					worker.terminate();
+				}
+			};
+		}
+	</script>
+</body>
+
+</html>
